@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "rise-aft-can"
+version = "0.1.0"
+description = ""
+authors = ["\"Jung, Hong-ryul\" <jung.hr.1206@gmail.com>"]
+readme = "README.md"
+packages = [{include = "rise_aft_can"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+canlib = "^1.24.935"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+rise-aft-can = "rise_aft_can.cli:main"
