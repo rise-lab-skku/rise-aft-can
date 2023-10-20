@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rise-aft-can"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["\"Jung, Hong-ryul\" <jung.hr.1206@gmail.com>"]
 readme = "README.md"

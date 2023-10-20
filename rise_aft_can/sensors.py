@@ -1,23 +1,27 @@
 from abc import ABCMeta, abstractmethod
+import time
 from canlib import canlib, Frame
 from rise_aft_can import utils
 
 
 class AFTSensor(metaclass=ABCMeta):
-    def __init__(self, channel: int):
+    def __init__(
+        self, channel: int = None, can_id: int = None, bitrate: canlib.Bitrate = None
+    ):
         self.channel = channel
-        self.bitrate = None
+        self.bitrate = bitrate
+        self.can_id = can_id
         self.ch = None
         # Last received data
         self.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
     def __enter__(self):
-        """ Enter with statement. """
+        """Enter with statement."""
         self.setup_channel()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """ Exit with statement. """
+        """Exit with statement."""
         self.teardown_channel()
 
     def setup_channel(self):
@@ -32,17 +36,18 @@ class AFTSensor(metaclass=ABCMeta):
 
     @abstractmethod
     def read(self) -> list:
-        """ Return [Fx, Fy, Fz, Tx, Ty, Tz] """
+        """Return [Fx, Fy, Fz, Tx, Ty, Tz]"""
         pass
 
 
 class AFT200D80(AFTSensor):
-    def __init__(self, channel: int):
-        super().__init__(channel)
-        self.bitrate = canlib.Bitrate.BITRATE_1M
+    def __init__(self, channel: int = 0, can_id: int = 1):
+        super().__init__(
+            channel=channel, can_id=can_id, bitrate=canlib.Bitrate.BITRATE_1M
+        )
 
     def read(self, timeout=1000) -> list:
-        """ Read Fx, Fy, Fz, Tx, Ty, Tz. (timeout: ms) """
+        """Read Fx, Fy, Fz, Tx, Ty, Tz. (timeout: ms)"""
         # Received frame ID will be 1 or 2 (1 -> 2 -> 1 -> 2 -> ...)
         # But we don't know which frame will be received first.
         # The first frame is always ID 1.
@@ -50,11 +55,13 @@ class AFT200D80(AFTSensor):
         first_id = self._handle_received_frame(timeout=timeout)
         second_id = self._handle_received_frame(timeout=timeout)
         if first_id == second_id:
-            raise RuntimeWarning(f"Some frames are lost. First ID: {first_id}, Second ID: {second_id}")
+            raise RuntimeWarning(
+                f"Some frames are lost. First ID: {first_id}, Second ID: {second_id}"
+            )
         return self.data
 
     def _handle_received_frame(self, timeout=1000) -> int:
-        """ Handle the received frame. Return the frame ID handled. """
+        """Handle the received frame. Return the frame ID handled."""
         # Read a bytearray
         frame = self.ch.read(timeout=timeout)
         # Convert data to force and torque
@@ -79,26 +86,60 @@ class AFT200D80(AFTSensor):
             raise ValueError(f"Received frame ID is not 1 or 2: {frame.id}")
         return frame.id
 
-    def set_continuous_transmitting(self):
-        self.ch.write(Frame(
-            id_=0x102,
-            data=[0x01, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00],
-            flags=canlib.MessageFlag.STD,
-        ))
+    def can_write(self, data_field: list):
+        self.ch.write(
+            Frame(
+                id_=0x102,
+                data=data_field,
+                flags=canlib.MessageFlag.STD,
+            )
+        )
 
-    def set_bias_setting(self):
-        self.ch.write(Frame(
-            id_=0x102,
-            data=[0x01, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00],
-            flags=canlib.MessageFlag.STD,
-        ))
+    def set_can_id(self, new_id: int):
+        print(f"Change CAN ID from {self.can_id} to {new_id}")
+        self.can_write([self.can_id, 0x01, new_id, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.can_id = new_id
+        print(f"CAN ID is changed to {self.can_id}.")
+
+    def set_bias_setting(self, sleep=1.0):
+        self.can_write([self.can_id, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
+        # Sleep more than 1 sec to wait for the bias setting to be completed.
+        # If you don't sleep, `canlib.CanNoMsg` will be raised continuously.
+        sleep = 1.0 if sleep < 1.0 else sleep
+        print(f"Sleep {sleep} sec to wait for the bias setting to be completed.")
+        time.sleep(sleep)
+        print("Bias setting is completed.")
 
     def set_bias_clear(self):
-        self.ch.write(Frame(
-            id_=0x102,
-            data=[0x01, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00],
-            flags=canlib.MessageFlag.STD,
-        ))
+        self.can_write([self.can_id, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
+        print("Bias is cleared.")
+
+    def set_continuous_transmitting(self):
+        self.can_write([self.can_id, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
+        print("Continuous transmitting is set.")
+
+    def set_sampling_rate(self, hz: int = 1000):
+        rate_param: int = 1_000_000 // hz
+        applied_hz: int = 1_000_000 // rate_param
+        print(f"Request: {hz} Hz, Applied: {applied_hz} Hz")
+        field_2 = rate_param // 256
+        field_3 = rate_param % 256
+        self.can_write([self.can_id, 0x05, field_2, field_3, 0x00, 0x00, 0x00, 0x00])
+
+    def reset_can_id_of_all_sensors(self):
+        answer = ""
+        while answer not in ["y", "n"]:
+            print("Reset CAN ID of all connected sensors. Are you sure? (y/n)")
+            answer = input()
+        if answer == "y":
+            self.can_write([0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+            print("CAN ID of all connected sensors is reset.")
+        else:
+            print("Canceled.")
+
+    def set_info_transmitting(self):
+        # ID, SN, release confirming mode
+        raise NotImplementedError
 
 
 # ====================================================
