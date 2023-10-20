@@ -19,10 +19,6 @@ tick_countup = 0.0
 
 with AFT200D80(channel) as aft:
     aft.set_bias_setting()
-    # Sleep more than 1 sec to wait for the bias setting to be completed.
-    # If you don't sleep, `canlib.CanNoMsg` will be raised continuously.
-    time.sleep(1)
-
     aft.set_continuous_transmitting()
 
     print("\nListening...")
