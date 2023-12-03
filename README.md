@@ -5,7 +5,8 @@
 
 1. [Compatibility](#compatibility)
 2. [Installation](#installation)
-3. [Minimal Python Example](#minimal-python-example)
+3. [Minimal Python Examples](#minimal-python-examples)
+4. [More Examples](#more-examples)
 
 ## Compatibility
 
@@ -86,7 +87,7 @@
    Firmware      :
    ```
 
-## Minimal Python Example
+## Minimal Python Examples
 
 > 실제 센서를 연결할 때에는 반드시 적절한 전원을 인가하라. 잘못된 전원은 센서를 망가뜨릴 수 있다. AFT200-D80-C의 경우 5V DC이다.
 
@@ -130,10 +131,14 @@ Closing channel: Kvaser U100 (channel 0)
 Channel closed.
 ```
 
-보다 자세한 사용법은 [example 폴더](./example)와 [소스코드](./rise_aft_can)를 참고하라.
+## More Examples
+
+- 예외 처리가 포함된 예제는 [./example/3_aft200_d80_advanced.py](./example/3_aft200_d80_advanced.py)를 참고해주세요.
+- Raw byte array 나 raw frame을 읽으려면, [./example/4_aft200_d80_raw_byte.py](./example/4_aft200_d80_raw_byte.py)를 참고해주세요.
+- 추가적인 내용은 [example 폴더](./example)와 [소스코드](./rise_aft_can)를 참고해주세요.
 
 ```sh
-$ python ./example/aft200_d80_advanced.py
+$ python ./example/3_aft200_d80_advanced.py
 Using channel: Kvaser U100 (channel 0), EAN: 73-30130-01173-1, Serial: 1007015
 
 Listening...

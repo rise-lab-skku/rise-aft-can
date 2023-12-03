@@ -83,7 +83,13 @@ class AFT200D80(AFTSensor):
             self.data[4] = Vy / 500 - 50
             self.data[5] = Vz / 500 - 50
         else:
-            raise ValueError(f"Received frame ID is not 1 or 2: {frame.id}")
+            _msg = (
+                f"Unexpected frame ID is received: {frame.id}\n"
+                "  Expected: 1 (force) or 2 (torque)\n"
+                "  Normally, if you try to set the bias setting of a calibrated sensor, you may receive a frame ID between 1 "
+                "and 6. In such a case, try using the *.wait_for_bias_info() method just below the *.set_bias_setting()."
+            )
+            raise ValueError(_msg)
         return frame.id
 
     def can_write(self, data_field: list):
@@ -114,6 +120,29 @@ class AFT200D80(AFTSensor):
         self.can_write([self.can_id, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
         print("Bias is cleared.")
 
+    def wait_for_bias_info(self, timeout=1.0):
+        """
+        After setting the bias setting, wait for the bias dev info. (Default timeout: 1 sec)
+        After the timeout, the method will be terminated.
+        """
+        print(f"Waiting for bias dev info... (timeout: {timeout} sec)")
+        last_frame_id = 6
+        start = time.time()
+        while True:
+            t = time.time()
+            if t - start > timeout:
+                print(f"[{t:.3f}] Timeout reached. Stop waiting...")
+                return
+            try:
+                frame = self.ch.read(timeout=timeout)
+                print(f"[{t:.3f}] Received frame ID: {frame.id}")
+                if frame.id == last_frame_id:
+                    print("Bias dev info is received.")
+                    return
+            except canlib.CanNoMsg:
+                print(f"[{t:.3f}] No message. Continue waiting...")
+                continue
+
     def set_continuous_transmitting(self):
         self.can_write([self.can_id, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
         print("Continuous transmitting is set.")
@@ -140,21 +169,3 @@ class AFT200D80(AFTSensor):
     def set_info_transmitting(self):
         # ID, SN, release confirming mode
         raise NotImplementedError
-
-
-# ====================================================
-# import shutil
-# import time
-
-# width, height = shutil.get_terminal_size((80, 20))
-
-# def printframe(frame):
-#     global width
-#     form = '═^' + str(width - 1)
-#     print(format(" Frame received ", form))
-#     print(frame)
-#     print(f"  id: {frame.id}")
-#     print(f"  data: {bytes(frame.data)}")
-#     print(f"  dlc: {frame.dlc}")
-#     print(f"  flags: {frame.flags}")
-#     print(f"  timestamp: {frame.timestamp}")
