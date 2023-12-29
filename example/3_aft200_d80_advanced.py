@@ -17,7 +17,7 @@ with AFT200D80(channel) as aft:
     aft.set_bias_setting()
     aft.set_continuous_transmitting()
 
-    aft.wait_for_bias_info(timeout_sec=1.0)
+    aft.wait_for_bias_info(timeout_sec=10)
 
     print("\nListening...")
     while True:
