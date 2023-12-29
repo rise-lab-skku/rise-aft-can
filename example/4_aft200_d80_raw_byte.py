@@ -9,7 +9,7 @@ with AFT200D80(channel) as aft:
     aft.set_continuous_transmitting()
 
     for _ in range(10):
-        raw_frame = aft.ch.read(timeout=1000)
+        raw_frame = aft.ch.read(timeout_sec=1)
 
         # raw frame
         print_pretty_raw_frame(raw_frame)
