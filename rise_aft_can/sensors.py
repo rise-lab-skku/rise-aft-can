@@ -46,24 +46,25 @@ class AFT200D80(AFTSensor):
             channel=channel, can_id=can_id, bitrate=canlib.Bitrate.BITRATE_1M
         )
 
-    def read(self, timeout=1000) -> list:
-        """Read Fx, Fy, Fz, Tx, Ty, Tz. (timeout: ms)"""
+    def read(self, timeout_sec=1.0) -> list:
+        """Read Fx, Fy, Fz, Tx, Ty, Tz. (timeout: sec)"""
         # Received frame ID will be 1 or 2 (1 -> 2 -> 1 -> 2 -> ...)
         # But we don't know which frame will be received first.
         # The first frame is always ID 1.
         # However, we can create AFT200D80 object while the sensor is already transmitting.
-        first_id = self._handle_received_frame(timeout=timeout)
-        second_id = self._handle_received_frame(timeout=timeout)
+        t_msec = int(timeout_sec * 1000)
+        first_id = self._handle_received_frame(timeout_ms_int=t_msec)
+        second_id = self._handle_received_frame(timeout_ms_int=t_msec)
         if first_id == second_id:
             raise RuntimeWarning(
                 f"Some frames are lost. First ID: {first_id}, Second ID: {second_id}"
             )
         return self.data
 
-    def _handle_received_frame(self, timeout=1000) -> int:
+    def _handle_received_frame(self, timeout_ms_int=1000) -> int:
         """Handle the received frame. Return the frame ID handled."""
         # Read a bytearray
-        frame = self.ch.read(timeout=timeout)
+        frame = self.ch.read(timeout=timeout_ms_int)  # (WARN) INT, msec
         # Convert data to force and torque
         # Data format:
         #     [ID, d[0], d[1], d[2], d[3], d[4], d[5], xx, xx]
@@ -120,21 +121,22 @@ class AFT200D80(AFTSensor):
         self.can_write([self.can_id, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
         print("Bias is cleared.")
 
-    def wait_for_bias_info(self, timeout=1.0):
+    def wait_for_bias_info(self, timeout_sec=1.0):
         """
         After setting the bias setting, wait for the bias dev info. (Default timeout: 1 sec)
         After the timeout, the method will be terminated.
         """
-        print(f"Waiting for bias dev info... (timeout: {timeout} sec)")
+        t_msec = int(timeout_sec * 1000)
+        print(f"Waiting for bias dev info... (timeout: {timeout_sec} sec)")
         last_frame_id = 6
         start = time.time()
         while True:
             t = time.time()
-            if t - start > timeout:
+            if t - start > timeout_sec:
                 print(f"[{t:.3f}] Timeout reached. Stop waiting...")
                 return
             try:
-                frame = self.ch.read(timeout=timeout)
+                frame = self.ch.read(timeout=t_msec)  # (WARN) INT, msec
                 print(f"[{t:.3f}] Received frame ID: {frame.id}")
                 if frame.id == last_frame_id:
                     print("Bias dev info is received.")

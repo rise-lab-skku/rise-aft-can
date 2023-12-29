@@ -15,14 +15,14 @@ tick_countup = 0.0
 
 with AFT200D80(channel) as aft:
     aft.set_bias_setting()
-    aft.wait_for_bias_info(timeout=1.0)
-
     aft.set_continuous_transmitting()
+
+    aft.wait_for_bias_info(timeout_sec=1.0)
 
     print("\nListening...")
     while True:
         try:
-            data: list = aft.read(timeout=int(timeout * 1000))
+            data: list = aft.read(timeout_sec=timeout)
             print(f"[{time.time():.3f}] {prettify(data)}")
 
         except canlib.CanNoMsg:
