@@ -3,6 +3,8 @@ import time
 from canlib import canlib, Frame
 from rise_aft_can import utils
 
+import struct
+
 
 class AFTSensor(metaclass=ABCMeta):
     def __init__(
@@ -13,7 +15,7 @@ class AFTSensor(metaclass=ABCMeta):
         self.can_id = can_id
         self.ch = None
         # Last received data
-        self.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.data = [0.0 for _ in range(9)]
 
     def __enter__(self):
         """Enter with statement."""
@@ -73,6 +75,7 @@ class AFT200D80(AFTSensor):
         Vx = frame.data[0] * 256 + frame.data[1]
         Vy = frame.data[2] * 256 + frame.data[3]
         Vz = frame.data[4] * 256 + frame.data[5]
+        print(frame.id)
         if frame.id == 1:
             # Force
             self.data[0] = Vx / 100 - 300
@@ -83,20 +86,34 @@ class AFT200D80(AFTSensor):
             self.data[3] = Vx / 500 - 50
             self.data[4] = Vy / 500 - 50
             self.data[5] = Vz / 500 - 50
-        else:
-            _msg = (
-                f"Unexpected frame ID is received: {frame.id}\n"
-                "  Expected: 1 (force) or 2 (torque)\n"
-                "  Normally, if you try to set the bias setting of a calibrated sensor, you may receive a frame ID between 1 "
-                "and 6. In such a case, try using the *.wait_for_bias_info() method just below the *.set_bias_setting()."
-            )
-            raise ValueError(_msg)
+        # else:
+        #     _msg = (
+        #         f"Unexpected frame ID is received: {frame.id}\n"
+        #         "  Expected: 1 (force) or 2 (torque)\n"
+        #         "  Normally, if you try to set the bias setting of a calibrated sensor, you may receive a frame ID between 1 "
+        #         "and 6. In such a case, try using the *.wait_for_bias_info() method just below the *.set_bias_setting()."
+        #     )
+        #     raise ValueError(_msg)
+        elif frame.id == 3:
+            # print(f"  data: {bytes(frame.data).hex(' ')}")
+            # print(
+            #     frame.data[0],
+            #     frame.data[1],
+            #     frame.data[2],
+            #     frame.data[3],
+            #     frame.data[4],
+            #     frame.data[5],
+            #     frame.data[6],
+            #     frame.data[7],
+            self.data[6] = Vx
+            self.data[7] = Vy
+            self.data[8] = Vz
+
         return frame.id
 
     def can_write(self, data_field: list):
         self.ch.write(
             Frame(
-                # id_ = index
                 id_=0x102,
                 data=data_field,
                 flags=canlib.MessageFlag.STD,
@@ -147,7 +164,9 @@ class AFT200D80(AFTSensor):
                 continue
 
     def set_continuous_transmitting(self):
+        self.get_imu_data()
         self.can_write([self.can_id, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
+
         print("Continuous transmitting is set.")
 
     def set_sampling_rate(self, hz: int = 1000):
@@ -164,7 +183,7 @@ class AFT200D80(AFTSensor):
             print("Reset CAN ID of all connected sensors. Are you sure? (y/n)")
             answer = input()
         if answer == "y":
-            self.can_write([0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+            self.can_write([0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00])
             print("CAN ID of all connected sensors is reset.")
         else:
             print("Canceled.")
@@ -172,3 +191,23 @@ class AFT200D80(AFTSensor):
     def set_info_transmitting(self):
         # ID, SN, release confirming mode
         raise NotImplementedError
+
+    def get_imu_data(self):
+        self.can_write([self.can_id, 0x06, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
+
+
+if __name__ == "__main__":
+    channel = 0
+
+    # open과 close를 안전하게 처리하기 위해 with 문 사용
+    # with 문을 사용하면, setup_channel()과 teardown_channel()을 자동으로 호출함
+    with AFT200D80(channel) as aft:
+        # aft.reset_can_id_of_all_sensors()
+        # aft.get_imu_data()
+        # aft.set_continuous_transmitting()
+        # aft.set_can_id()
+        # aft.can_write([0x06, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00])
+        for _ in range(100):
+            data: list = aft.read()
+            print(data)
+            # print(f"Fxyz[N], Txyz[Nm]: {data}")
