@@ -15,7 +15,7 @@ def print_pretty_raw_frame(frame: Frame) -> str:
     form = '═^' + str(width - 1)
     print(format(" Frame received ", form))
     print(f"  id: {frame.id}")
-    print(f"  data: {bytes(frame.data)}")
+    print(f"  data: {bytes(frame.data).hex(' ')}")
     print(f"  dlc: {frame.dlc}")
     print(f"  flags: {frame.flags}")
     print(f"  timestamp: {frame.timestamp}")
